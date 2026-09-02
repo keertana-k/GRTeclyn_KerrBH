@@ -6,17 +6,16 @@
 #include "KerrBHLevel.hpp"
 
 #include "AlgebraicConstraintsEnforcer.hpp"
-#include "BinaryBHInitialData.hpp"
 #include "CCZ4RHS.hpp"
 #include "ChiTagger.hpp"
 #include "Constraints.hpp"
 #include "ExtractionTagger.hpp"
 #include "FourthOrderDerivatives.hpp"
+#include "KerrBHInitialData.hpp"
 #include "PositiveChiAndLapse.hpp"
 #include "PunctureTagger.hpp"
 #include "PunctureTracker.hpp"
 #include "SixthOrderDerivatives.hpp"
-#include "TwoPuncturesInitialData.hpp"
 #include "Weyl4.hpp"
 #include "WeylExtraction.hpp"
 
@@ -73,86 +72,45 @@ void KerrBHLevel::initData()
     {
         amrex::Print() << "KerrBHLevel::initData " << Level() << "\n";
     }
-#ifdef USE_TWOPUNCTURES
-    TwoPuncturesInitialData two_punctures_initial_data(Geom().CellSize(0));
-
-    two_punctures_initial_data.solve(); // only solves first time
-
-    amrex::MultiFab &state_new = get_new_data(state_index);
-#ifdef AMREX_USE_GPU
-    amrex::MFInfo mf_info;
-    mf_info.SetArena(amrex::The_Cpu_Arena());
-    amrex::MultiFab host_state(state_new.boxArray(),
-                               state_new.DistributionMap(), state_new.nComp(),
-                               state_new.nGrowVect(), mf_info);
-#else
-    amrex::MultiFab &host_state = state_new;
-#endif
-
-#ifdef AMREX_USE_OMP
-#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
-#endif
-    for (amrex::MFIter mfi(state_new, amrex::TilingIfNotGPU()); mfi.isValid();
-         ++mfi)
-    {
-        const amrex::Box &grown_tile_box = mfi.growntilebox();
-        const auto &state_array          = host_state.array(mfi);
-
-        amrex::LoopOnCpu(
-            grown_tile_box, [=](int ix, int iy, int iz)
-            { two_punctures_initial_data(ix, iy, iz, state_array); });
-#ifdef AMREX_USE_GPU
-        // Copy to device
-        amrex::Gpu::htod_memcpy_async(
-            state_new[mfi].dataPtr(), host_state[mfi].dataPtr(),
-            host_state[mfi].size() * sizeof(amrex::Real));
-#endif
-    }
-
-#else
     // Set up the compute class for the KerrBH initial data
     amrex::Real dx = Geom().CellSize(0);
-    BinaryBHInitialData binary_initial_data(dx);
-    static_assert(std::is_trivially_copyable_v<BinaryBHInitialData>,
-                  "BinaryBHInitialData needs to be device copyable");
+    KerrBHInitialData::params_t params;
 
+    GRParmParse pp;
+    pp.get("kerr_mass", params.mass);
+    pp.get("kerr_spin", params.spin);
+    for (int i = 0; i < AMREX_SPACEDIM; ++i)
+    {
+    params.center[i] = 0.0;
+    }
+    KerrBHInitialData kerr_initial_data(params, dx);
     // First set everything to zero (to avoid undefinded values in constraints)
     // then calculate initial data
     amrex::MultiFab &state_new = get_new_data(state_index);
-    const auto &state_arrays   = state_new.arrays();
-    amrex::ParallelFor(state_new, state_new.nGrowVect(),
-                       [=] AMREX_GPU_DEVICE(int box_no, int ix, int iy, int iz)
-                       {
-                           amrex::CellData<amrex::Real> cell =
-                               state_arrays[box_no].cellData(ix, iy, iz);
-                           for (int n = 0; n < cell.nComp(); ++n)
-                           {
-                               cell[n] = 0.;
-                           }
-                           binary_initial_data(ix, iy, iz,
-                                               state_arrays[box_no]);
-                       });
-#endif
-    amrex::Gpu::streamSynchronize();
+    state_new.setVal(0.0);
+    for (amrex::MFIter mfi(state_new); mfi.isValid(); ++mfi)
+    {
+        const amrex::Box &box = mfi.validbox();
+        auto state = state_new.array(mfi);
+
+        for (int iz = box.smallEnd(2); iz <= box.bigEnd(2); ++iz)
+        {
+            for (int iy = box.smallEnd(1); iy <= box.bigEnd(1); ++iy)
+            {
+                for (int ix = box.smallEnd(0); ix <= box.bigEnd(0); ++ix)
+                {
+                kerr_initial_data(ix, iy, iz, state);
+                }
+            }
+        }
+    }
+    //amrex::Gpu::streamSynchronize();
+
 
     if (get_bh_amr_ptr()->puncture_tracking_enabled() && Level() == 0)
     {
-        // need to set the puncture coordinates as we use it for the puncture
-        // tagging
-        BoostedBHInitialData::params_t bh1_params(1);
-        BoostedBHInitialData::params_t bh2_params(2);
-#ifdef USE_TWOPUNCTURES
-        two_punctures_initial_data.set_bh_params(bh1_params, bh2_params);
-#else
-        bh1_params.fill_params();
-        bh2_params.fill_params();
-#endif
-
         get_puncture_tracker().set_puncture_coords(
-            {bh1_params.center[0], bh1_params.center[1], bh1_params.center[2],
-             bh2_params.center[0], bh2_params.center[1], bh2_params.center[2]});
-        // can't call start_from_initial_punctures() because we need the full
-        // AMR grid first
+            {params.center[0], params.center[1], params.center[2]});
     }
 }
 
@@ -299,32 +257,34 @@ void KerrBHLevel::tag_cells(amrex::TagBoxArray &a_tag_box_array,
     const auto &state_const_arrays = state_new.const_arrays();
 
     ChiTagger chi_tagger(Geom().CellSize(0), a_regrid_threshold);
-
+// Get Kerr mass from the parameter file
     GRParmParse pp;
+    amrex::Real kerr_mass{};
+    pp.get("kerr_mass", kerr_mass);
+
+    ChiTagger chi_tagger(Geom().CellSize(0), a_regrid_threshold);
+
     spherical_extraction_params_t extraction_params("weyl_extraction");
     extraction_params.fill_params();
     ExtractionTagger extraction_tagger(Geom().CellSize(0), Level(),
                                        extraction_params);
 
+    //Puncture coords
     constexpr auto num_puncture_coords =
         static_cast<std::size_t>(AMREX_SPACEDIM * num_punctures);
     std::array<amrex::Real, num_puncture_coords> puncture_coords{};
     const bool puncture_tracking_enabled =
         get_bh_amr_ptr()->puncture_tracking_enabled();
 
-    if (puncture_tracking_enabled)
+    
+        if (puncture_tracking_enabled)
     {
         puncture_coords = get_puncture_tracker().get_puncture_coords();
     }
-
-    amrex::Real bh1_mass{};
-    amrex::Real bh2_mass{};
-    pp.get("bh1.mass", bh1_mass);
-    pp.get("bh2.mass", bh2_mass);
-
+    // Puncture tagger
     PunctureTagger<num_punctures> puncture_tagger(
         Geom().CellSize(0), Level(), get_gr_amr_ptr()->maxLevel(),
-        puncture_coords, {bh1_mass, bh2_mass});
+        puncture_coords, {kerr_mass});
 
     amrex::ParallelFor(state_new, amrex::IntVect(0),
                        [=] AMREX_GPU_DEVICE(int box_no, int ix, int iy, int iz)
