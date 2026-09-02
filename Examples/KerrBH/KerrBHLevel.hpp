@@ -18,7 +18,7 @@ class KerrBHLevel : public GRAmrLevel
     // Inherit the contructors from GRAmrLevel
     using GRAmrLevel::GRAmrLevel;
 
-    static constexpr int num_punctures = 2;
+    static constexpr int num_punctures = 1;
 
     BHAmr<num_punctures> *get_bh_amr_ptr();
 
