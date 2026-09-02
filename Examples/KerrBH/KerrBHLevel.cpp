@@ -256,7 +256,6 @@ void KerrBHLevel::tag_cells(amrex::TagBoxArray &a_tag_box_array,
     const auto &tag_arrays         = a_tag_box_array.arrays();
     const auto &state_const_arrays = state_new.const_arrays();
 
-    ChiTagger chi_tagger(Geom().CellSize(0), a_regrid_threshold);
 // Get Kerr mass from the parameter file
     GRParmParse pp;
     amrex::Real kerr_mass{};
