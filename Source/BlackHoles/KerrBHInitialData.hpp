@@ -6,23 +6,19 @@
 #ifndef KERRBHINITIALDATA_HPP_
 #define KERRBHINITIALDATA_HPP_
 
-#include "ADMConformalVars.hpp"
 #include "CoordinateTransformations.hpp"
 #include "Coordinates.hpp"
 #include "StateVariables.hpp" //This files needs NUM_VARS - total number of components
 #include "Tensor.hpp"
 #include "TensorAlgebra.hpp"
-#include "VarsTools.hpp"
-#include "simd.hpp"
+#include <array>
+#include <cmath>
 
 //! Class which computes the Kerr initial conditions per arXiv 1401.1548
 class KerrBHInitialData
 {
-    // Use the variable definition in CCZ4
-    template <class data_t>
-    using Vars = ADMConformalVars::VarsWithGauge<data_t>;
-
-  public:
+ 
+   public:
     //! Stuct for the params of the Kerr BHInitialData
     struct params_t
     {
@@ -48,21 +44,17 @@ class KerrBHInitialData
         }
     }
 
-    template <class data_t> void compute(Cell<data_t> current_cell) const;
-
+    void operator()(int ix, int iy, int iz,
+           const amrex::Array4<amrex::Real> &state) const;
   protected:
     //! Function which computes the components of the metric in spherical coords
-    template <class data_t>
+    AMREX_FORCE_INLINE 
     void compute_kerr(
-        Tensor<2, data_t>
-            &spherical_g, //!<< The spatial metric in spherical coords
-        Tensor<2, data_t>
-            &spherical_K, //!<< The extrinsic curvature in spherical coords
-        Tensor<1, data_t>
-            &spherical_shift, //!<< The spherical components of the shift
-        data_t &kerr_lapse,   //!<< The lapse for the kerr solution
-        const Coordinates<data_t> coords //!<< Coords of current cell
-    ) const;
+    Tensor::Sym12Rank2 &spherical_g,
+    Tensor::Sym12Rank2 &spherical_K,
+    Tensor::Rank1 &spherical_shift,
+    amrex::Real &kerr_lapse,
+    const Coordinates coords) const;
 };
 
 #include "KerrBHInitialData.impl.hpp"
