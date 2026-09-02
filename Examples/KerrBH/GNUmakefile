@@ -2,7 +2,7 @@ GRTECLYN_HOME = $(realpath ../..)
 
 include $(GRTECLYN_HOME)/Tools/GNUMake/Make.defaults
 
-EBASE = BinaryBH
+EBASE = KerrBH
 
 # We use particles for the puncture tracking
 USE_PARTICLES = TRUE

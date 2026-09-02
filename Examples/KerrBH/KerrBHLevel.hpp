@@ -3,14 +3,14 @@
  * Please refer to LICENSE in GRTeclyn's root directory.
  */
 
-#ifndef BINARYBHLEVEL_HPP_
-#define BINARYBHLEVEL_HPP_
+#ifndef KERRBHLEVEL_HPP_
+#define KERRBHLEVEL_HPP_
 
 #include "BHAmr.hpp"
 #include "DefaultLevelBld.hpp"
 #include "GRAmrLevel.hpp"
 
-class BinaryBHLevel : public GRAmrLevel
+class KerrBHLevel : public GRAmrLevel
 {
   public:
     static void variableSetUp();

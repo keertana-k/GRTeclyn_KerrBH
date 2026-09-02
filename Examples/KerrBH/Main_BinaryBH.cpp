@@ -12,7 +12,7 @@
 #include "SimulationParameters.hpp"
 
 // Problem specific includes:
-#include "BinaryBHLevel.hpp"
+#include "KerrBHLevel.hpp"
 
 // System includes
 #include <chrono>
@@ -31,9 +31,9 @@ int runGRTeclyn()
         return 0;
     }
 
-    DefaultLevelBld<BinaryBHLevel> bh_level_bld;
+    DefaultLevelBld<KerrBHLevel> bh_level_bld;
 
-    BHAmr<BinaryBHLevel::num_punctures> bh_amr(&bh_level_bld);
+    BHAmr<KerrBHLevel::num_punctures> bh_amr(&bh_level_bld);
 
     double stop_time{};
     pp.get("evolution.stop_time", stop_time);

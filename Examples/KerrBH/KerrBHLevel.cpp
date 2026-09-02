@@ -3,7 +3,7 @@
  * Please refer to LICENSE in GRTeclyn's root directory.
  */
 
-#include "BinaryBHLevel.hpp"
+#include "KerrBHLevel.hpp"
 
 #include "AlgebraicConstraintsEnforcer.hpp"
 #include "BinaryBHInitialData.hpp"
@@ -20,20 +20,20 @@
 #include "Weyl4.hpp"
 #include "WeylExtraction.hpp"
 
-BHAmr<BinaryBHLevel::num_punctures> *BinaryBHLevel::get_bh_amr_ptr()
+BHAmr<KerrBHLevel::num_punctures> *KerrBHLevel::get_bh_amr_ptr()
 {
     return dynamic_cast<BHAmr<num_punctures> *>(get_gr_amr_ptr());
 }
 
-PunctureTracker<BinaryBHLevel::num_punctures> &
-BinaryBHLevel::get_puncture_tracker()
+PunctureTracker<KerrBHLevel::num_punctures> &
+KerrBHLevel::get_puncture_tracker()
 {
     return get_bh_amr_ptr()->get_puncture_tracker();
 }
 
-void BinaryBHLevel::variableSetUp()
+void KerrBHLevel::variableSetUp()
 {
-    BL_PROFILE("BinaryBHLevel::variableSetUp()");
+    BL_PROFILE("KerrBHLevel::variableSetUp()");
 
     // Set up the state variables
     state_variable_set_up();
@@ -44,7 +44,7 @@ void BinaryBHLevel::variableSetUp()
 }
 
 // Things to do during the advance step after RK4 steps
-void BinaryBHLevel::specific_advance()
+void KerrBHLevel::specific_advance()
 {
     amrex::MultiFab &state_new = get_new_data(state_index);
     const auto &state_arrays   = state_new.arrays();
@@ -66,12 +66,12 @@ void BinaryBHLevel::specific_advance()
 
 // This initial data uses an approximation for the metric which
 // is valid for small boosts
-void BinaryBHLevel::initData()
+void KerrBHLevel::initData()
 {
-    BL_PROFILE("BinaryBHLevel::initData");
+    BL_PROFILE("KerrBHLevel::initData");
     if (get_gr_amr_ptr()->Verbose() > 0)
     {
-        amrex::Print() << "BinaryBHLevel::initData " << Level() << "\n";
+        amrex::Print() << "KerrBHLevel::initData " << Level() << "\n";
     }
 #ifdef USE_TWOPUNCTURES
     TwoPuncturesInitialData two_punctures_initial_data(Geom().CellSize(0));
@@ -110,7 +110,7 @@ void BinaryBHLevel::initData()
     }
 
 #else
-    // Set up the compute class for the BinaryBH initial data
+    // Set up the compute class for the KerrBH initial data
     amrex::Real dx = Geom().CellSize(0);
     BinaryBHInitialData binary_initial_data(dx);
     static_assert(std::is_trivially_copyable_v<BinaryBHInitialData>,
@@ -158,11 +158,11 @@ void BinaryBHLevel::initData()
 
 // Calculate RHS during RK4 substeps
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-void BinaryBHLevel::specific_eval_rhs(amrex::MultiFab &a_soln,
+void KerrBHLevel::specific_eval_rhs(amrex::MultiFab &a_soln,
                                       amrex::MultiFab &a_rhs,
                                       const amrex::Real /*a_time*/)
 {
-    BL_PROFILE("BinaryBHLevel::specific_eval_rhs()");
+    BL_PROFILE("KerrBHLevel::specific_eval_rhs()");
     const auto &soln_arrays       = a_soln.arrays();
     const auto &const_soln_arrays = a_soln.const_arrays();
     const auto &rhs_arrays        = a_rhs.arrays();
@@ -259,7 +259,7 @@ void BinaryBHLevel::specific_eval_rhs(amrex::MultiFab &a_soln,
 }
 
 // enforce algebraic constraints during RK4 substeps
-void BinaryBHLevel::specific_update_ode(amrex::MultiFab &a_soln)
+void KerrBHLevel::specific_update_ode(amrex::MultiFab &a_soln)
 {
 
     AlgebraicConstraintsEnforcer algebraic_constraints_enforcer;
@@ -275,7 +275,7 @@ void BinaryBHLevel::specific_update_ode(amrex::MultiFab &a_soln)
     amrex::Gpu::streamSynchronize();
 }
 
-void BinaryBHLevel::pre_tag_cells()
+void KerrBHLevel::pre_tag_cells()
 {
     amrex::MultiFab &state_new = get_new_data(state_index);
     const auto current_time    = get_state_data(state_index).curTime();
@@ -289,10 +289,10 @@ void BinaryBHLevel::pre_tag_cells()
               num_comps);
 }
 
-void BinaryBHLevel::tag_cells(amrex::TagBoxArray &a_tag_box_array,
+void KerrBHLevel::tag_cells(amrex::TagBoxArray &a_tag_box_array,
                               amrex::Real a_regrid_threshold)
 {
-    BL_PROFILE("BinaryBHLevel::tag_cells()");
+    BL_PROFILE("KerrBHLevel::tag_cells()");
     amrex::MultiFab &state_new = get_new_data(state_index);
 
     const auto &tag_arrays         = a_tag_box_array.arrays();
@@ -343,9 +343,9 @@ void BinaryBHLevel::tag_cells(amrex::TagBoxArray &a_tag_box_array,
     amrex::Gpu::streamSynchronize();
 }
 
-void BinaryBHLevel::specific_post_init()
+void KerrBHLevel::specific_post_init()
 {
-    BL_PROFILE("BinaryBHLevel::specific_post_init()");
+    BL_PROFILE("KerrBHLevel::specific_post_init()");
 
     if (get_bh_amr_ptr()->puncture_tracking_enabled() && Level() == 0)
     {
@@ -353,9 +353,9 @@ void BinaryBHLevel::specific_post_init()
     }
 }
 
-void BinaryBHLevel::specific_post_restart()
+void KerrBHLevel::specific_post_restart()
 {
-    BL_PROFILE("BinaryBHLevel::specific_post_restart()");
+    BL_PROFILE("KerrBHLevel::specific_post_restart()");
 
     if (get_bh_amr_ptr()->puncture_tracking_enabled() && Level() == 0)
     {
@@ -366,7 +366,7 @@ void BinaryBHLevel::specific_post_restart()
     }
 }
 
-void BinaryBHLevel::specific_post_plotfile(const std::string &a_dir,
+void KerrBHLevel::specific_post_plotfile(const std::string &a_dir,
                                            std::ostream &a_os)
 {
     if (get_bh_amr_ptr()->puncture_tracking_enabled() && Level() == 0)
@@ -375,7 +375,7 @@ void BinaryBHLevel::specific_post_plotfile(const std::string &a_dir,
     }
 }
 
-void BinaryBHLevel::specific_post_checkpoint(const std::string &a_chk_dir,
+void KerrBHLevel::specific_post_checkpoint(const std::string &a_chk_dir,
                                              std::ostream & /*a_os*/)
 {
     if (get_bh_amr_ptr()->puncture_tracking_enabled() && Level() == 0)
@@ -384,9 +384,9 @@ void BinaryBHLevel::specific_post_checkpoint(const std::string &a_chk_dir,
     }
 }
 
-void BinaryBHLevel::specific_post_timestep()
+void KerrBHLevel::specific_post_timestep()
 {
-    BL_PROFILE("BinaryBHLevel::specific_post_timestep");
+    BL_PROFILE("KerrBHLevel::specific_post_timestep");
 
     if (get_bh_amr_ptr()->puncture_tracking_enabled())
     {

@@ -1,4 +1,4 @@
-# GRTeclyn BinaryBH parameter file for the GitHub Actions regression test
+# GRTeclyn BinaryBH(Porting the Kerr BH) parameter file for the GitHub Actions regression test
 # Commented parameters show default or suggested values
 
 #################################################
