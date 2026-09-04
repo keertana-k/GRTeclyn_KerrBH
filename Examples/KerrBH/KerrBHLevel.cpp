@@ -96,18 +96,14 @@ void KerrBHLevel::initData()
         const amrex::Box &box = mfi.validbox();
         auto state = state_new.array(mfi);
 
-        for (int iz = box.smallEnd(2); iz <= box.bigEnd(2); ++iz)
+        amrex::ParallelFor(
+        box,
+        [=, kerr_initial_data] AMREX_GPU_DEVICE(int ix, int iy, int iz)
         {
-            for (int iy = box.smallEnd(1); iy <= box.bigEnd(1); ++iy)
-            {
-                for (int ix = box.smallEnd(0); ix <= box.bigEnd(0); ++ix)
-                {
-                kerr_initial_data(ix, iy, iz, state);
-                }
-            }
-        }
+            kerr_initial_data(ix, iy, iz, state);
+        });
     }
-    //amrex::Gpu::streamSynchronize();
+    amrex::Gpu::streamSynchronize();
 
 
     if (get_bh_amr_ptr()->puncture_tracking_enabled() && Level() == 0)
