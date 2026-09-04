@@ -65,11 +65,13 @@ class KerrBHInitialData
 
         m_R = CoordinateTransformations::rotation_matrix(spin_dir, z_dir);
     }
-
+    AMREX_GPU_DEVICE
+    AMREX_FORCE_INLINE
     void operator()(int ix, int iy, int iz,
            const amrex::Array4<amrex::Real> &state) const;
   protected:
     //! Function which computes the components of the metric in spherical coords
+    AMREX_GPU_DEVICE
     AMREX_FORCE_INLINE 
     void compute_kerr(
     Tensor::Sym12Rank2 &spherical_g,
