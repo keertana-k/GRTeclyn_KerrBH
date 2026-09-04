@@ -86,7 +86,17 @@ void KerrBHLevel::initData()
     {
         params.center[i] = center[i];
     }
+
+    amrex::RealVect spin_direction;
+    pp.getarr("kerr_spin_direction", spin_direction);
+
+    for (int i = 0; i < AMREX_SPACEDIM; ++i)
+    {
+        params.spin_direction[i] = spin_direction[i];
+    }
+    
     KerrBHInitialData kerr_initial_data(params, dx);
+    
     // First set everything to zero (to avoid undefinded values in constraints)
     // then calculate initial data
     amrex::MultiFab &state_new = get_new_data(state_index);
@@ -96,8 +106,7 @@ void KerrBHLevel::initData()
         const amrex::Box &box = mfi.validbox();
         auto state = state_new.array(mfi);
 
-        amrex::ParallelFor(
-        box,
+        amrex::ParallelFor(box,
         [=, kerr_initial_data] AMREX_GPU_DEVICE(int ix, int iy, int iz)
         {
             kerr_initial_data(ix, iy, iz, state);
