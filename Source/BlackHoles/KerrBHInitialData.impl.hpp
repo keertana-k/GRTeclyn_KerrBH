@@ -33,9 +33,13 @@ void KerrBHInitialData::operator()(
     compute_kerr(spherical_g, spherical_K, spherical_shift, kerr_lapse, coords);
 
     // work out where we are on the grid
-    amrex::Real x = coords.x;
-    amrex::Real y = coords.y;
-    amrex::Real z = coords.z;
+    Tensor::Rank1 pos{coords.x, coords.y, coords.z};
+
+    Tensor::Rank1 pos_rotated = CoordinateTransformations::transform_vector(pos, m_R);
+
+    amrex::Real x = pos_rotated(0);
+    amrex::Real y = pos_rotated(1);
+    amrex::Real z = pos_rotated(2);
 
     using namespace CoordinateTransformations;
     // Convert spherical components to cartesian components using coordinate
@@ -48,6 +52,17 @@ void KerrBHInitialData::operator()(
     A_sym = spherical_to_cartesian_LL(spherical_K, x, y, z);
     shift = spherical_to_cartesian_U(spherical_shift, x, y, z);
 
+    Tensor::Rank2 R_transpose;
+
+    FOR(i, j)
+    {
+        R_transpose(i, j) = m_R(j, i);
+    }
+
+    h_sym = transform_sym_tensor_LL(h_sym, R_transpose);
+    A_sym = transform_sym_tensor_LL(A_sym, R_transpose);
+    shift = transform_vector(shift, R_transpose);
+    
     // TensorAlgebra uses full Rank2 tensors for determinant,
     // trace and trace-free operations.
     Tensor::Rank2 h;
@@ -122,13 +137,17 @@ void KerrBHInitialData::compute_kerr(
     amrex::Real a = m_params.spin;
 
     // work out where we are on the grid
-    amrex::Real x = coords.x;
-    amrex::Real y = coords.y;
-    amrex::Real z = coords.z;
+    Tensor::Rank1 pos{coords.x, coords.y, coords.z};
+    Tensor::Rank1 pos_rotated = CoordinateTransformations::transform_vector(pos, m_R);
+
+    amrex::Real x = pos_rotated(0);
+    amrex::Real y = pos_rotated(1);
+    amrex::Real z = pos_rotated(2);
 
     // the radius, subject to a floor
-    amrex::Real r  = coords.get_radius();
-    amrex::Real r2 = r * r;
+    amrex::Real r2 = x*x + y*y + z*z;
+    amrex::Real r  = sqrt(amrex::max(r2, 1e-14));
+
 
     // the radius in xy plane, subject to a floor
     amrex::Real rho2 = amrex::max(x * x + y * y, 1e-12);
