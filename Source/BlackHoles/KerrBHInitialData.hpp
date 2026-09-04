@@ -26,11 +26,14 @@ class KerrBHInitialData
         std::array<amrex::Real, AMREX_SPACEDIM>
             center;       //!< The center of the Kerr BH
         amrex::Real spin; //!< The spin param a = J/M, so 0 <= |a| <= M
+        std::array<amrex::Real, AMREX_SPACEDIM>
+            spin_direction; //!< The direction of the spin of the Kerr BH
     };
 
   protected:
     amrex::Real m_dx;
     params_t m_params;
+    Tensor::Rank2 m_R;
 
   public:
     KerrBHInitialData(params_t a_params, amrex::Real a_dx)
@@ -42,6 +45,25 @@ class KerrBHInitialData
         {
             amrex::Abort("The spin parameter must satisfy |a| <= M");
         }
+        Tensor::Rank1 spin_dir{
+            m_params.spin_direction[0],
+            m_params.spin_direction[1], 
+            m_params.spin_direction[2]};
+
+        amrex::Real spin_dir_norm = sqrt(spin_dir(0) * spin_dir(0) + spin_dir(1) * spin_dir(1) +
+                                      spin_dir(2) * spin_dir(2));
+        if (spin_dir_norm <1e-14)
+        {
+            amrex::Abort("The spin direction must be non-zero");
+        }
+        FOR(i)
+        {
+            spin_dir(i) /= spin_dir_norm;
+        }
+
+        Tensor::Rank1 z_dir = {0.0, 0.0, 1.0};
+
+        m_R = CoordinateTransformations::rotation_matrix(spin_dir, z_dir);
     }
 
     void operator()(int ix, int iy, int iz,
