@@ -79,12 +79,7 @@ void KerrBHLevel::initData()
     GRParmParse pp;
     pp.get("kerr_mass", params.mass);
     pp.get("kerr_spin", params.spin);
-    pp.getarr("kerr_center", center);
-
-    for (int i = 0; i < AMREX_SPACEDIM; ++i)
-    {
-        params.center[i] = center[i];
-    }
+    pp.getarr("kerr_center", params.center);
 
     KerrBHInitialData kerr_initial_data(params, dx);
     // First set everything to zero (to avoid undefinded values in constraints)
