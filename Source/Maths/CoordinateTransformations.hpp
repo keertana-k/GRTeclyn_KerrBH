@@ -19,6 +19,7 @@ namespace CoordinateTransformations
 // Jacobian transformation matrix
 
 // NOLINTBEGIN(bugprone-easily-swappable-parameters)
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
 static Tensor::Rank2 spherical_jacobian(const amrex::Real x,
                                         const amrex::Real y,
                                         const amrex::Real z)
@@ -53,6 +54,7 @@ static Tensor::Rank2 spherical_jacobian(const amrex::Real x,
 // Inverse Jacobian
 
 // NOLINTBEGIN(bugprone-easily-swappable-parameters)
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
 static Tensor::Rank2 inverse_spherical_jacobian(const amrex::Real x,
                                                 const amrex::Real y,
                                                 const amrex::Real z)
@@ -88,6 +90,7 @@ static Tensor::Rank2 inverse_spherical_jacobian(const amrex::Real x,
 // coords
 
 // NOLINTBEGIN(bugprone-easily-swappable-parameters)
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
 static Tensor::Sym12Rank2
 spherical_to_cartesian_LL(const Tensor::Sym12Rank2 &spherical_g,
                           const amrex::Real x, const amrex::Real y,
@@ -114,6 +117,7 @@ spherical_to_cartesian_LL(const Tensor::Sym12Rank2 &spherical_g,
 // coords
 
 // NOLINTBEGIN(bugprone-easily-swappable-parameters)
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
 static Tensor::Sym12Rank2
 spherical_to_cartesian_UU(const Tensor::Sym12Rank2 &spherical_g_UU,
                           const amrex::Real x, const amrex::Real y,
@@ -141,6 +145,7 @@ spherical_to_cartesian_UU(const Tensor::Sym12Rank2 &spherical_g_UU,
 // coords
 
 // NOLINTBEGIN(bugprone-easily-swappable-parameters)
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
 static Tensor::Sym12Rank2
 cartesian_to_spherical_LL(const Tensor::Sym12Rank2 &cartesian_g,
                           const amrex::Real x, const amrex::Real y,
@@ -168,6 +173,7 @@ cartesian_to_spherical_LL(const Tensor::Sym12Rank2 &cartesian_g,
 // coords
 
 // NOLINTBEGIN(bugprone-easily-swappable-parameters)
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE 
 static Tensor::Sym12Rank2
 cartesian_to_spherical_UU(const Tensor::Sym12Rank2 &cartesian_g_UU,
                           amrex::Real x, amrex::Real y, amrex::Real z)
