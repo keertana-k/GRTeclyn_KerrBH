@@ -14,6 +14,222 @@
 
 // Computes semi-isotropic Kerr solution as detailed in Liu, Etienne and Shapiro
 // 2010, arxiv gr-qc/1001.4077
+AMREX_GPU_DEVICE
+AMREX_FORCE_INLINE
+void KerrBHInitialData::operator()(
+    int ix, int iy, int iz,
+    const amrex::Array4<amrex::Real> &state) const
+{
+    const amrex::CellData<amrex::Real> &state_cell_data =
+        state.cellData(ix, iy, iz);
+
+    Coordinates coords(amrex::IntVect(ix, iy, iz), m_dx, m_params.center);
+
+    Tensor::Sym12Rank2 spherical_g;
+    Tensor::Sym12Rank2 spherical_K;
+    Tensor::Rank1 spherical_shift;
+    amrex::Real kerr_lapse;
+
+    // Compute the components in spherical coords as per 1401.1548
+    compute_kerr(spherical_g, spherical_K, spherical_shift, kerr_lapse, coords);
+
+    // work out where we are on the grid
+    Tensor::Rank1 pos{coords.x, coords.y, coords.z};
+
+    Tensor::Rank1 pos_rotated = CoordinateTransformations::transform_vector(pos, m_R);
+
+    amrex::Real x = pos_rotated(0);
+    amrex::Real y = pos_rotated(1);
+    amrex::Real z = pos_rotated(2);
+
+    using namespace CoordinateTransformations;
+    // Convert spherical components to cartesian components using coordinate
+    // transforms
+    Tensor::Sym12Rank2 h_sym;
+    Tensor::Sym12Rank2 A_sym;
+    Tensor::Rank1 shift;
+
+    h_sym = spherical_to_cartesian_LL(spherical_g, x, y, z);
+    A_sym = spherical_to_cartesian_LL(spherical_K, x, y, z);
+    shift = spherical_to_cartesian_U(spherical_shift, x, y, z);
+
+    Tensor::Rank2 R_transpose;
+
+    FOR(i, j)
+    {
+        R_transpose(i, j) = m_R(j, i);
+    }
+
+    h_sym = transform_sym_tensor_LL(h_sym, R_transpose);
+    A_sym = transform_sym_tensor_LL(A_sym, R_transpose);
+    shift = transform_vector(shift, R_transpose);
+    
+    // TensorAlgebra uses full Rank2 tensors for determinant,
+    // trace and trace-free operations.
+    Tensor::Rank2 h;
+    Tensor::Rank2 A;
+
+    FOR (i, j)
+    {
+        h(i, j) = h_sym(i, j);
+        A(i, j) = A_sym(i, j);
+    }
+
+    using namespace TensorAlgebra;
+
+    amrex::Real deth = compute_determinant(h);
+
+    // compute_inverse_sym specifically expects Sym12Rank2
+    auto h_UU_sym = compute_inverse_sym(h_sym);
+
+    // Convert inverse metric back to a full Rank2 for compute_trace
+    // and make_trace_free.
+    Tensor::Rank2 h_UU;
+
+    FOR (i, j)
+    {
+        h_UU(i, j) = h_UU_sym(i, j);
+    }
+    amrex::Real chi = pow(deth, -1. / 3.);
+
+    amrex::Real K = compute_trace(A, h_UU);
+    make_trace_free(A, h, h_UU);
+
+    // Make conformal
+    FOR (i, j)
+    {
+        h(i, j) *= chi;
+        A(i, j) *= chi;
+    }
+
+    // use a pre collapsed lapse, could also use analytic one
+    // vars.lapse = kerr_lapse;
+    amrex::Real lapse = pow(chi,0.5);
+
+    // Populate the variables on the grid
+    // NB We stil need to set Gamma^i which is NON ZERO
+    // but we do this via a separate class/compute function
+    // as we need the gradients of the metric which are not yet available
+   state_cell_data[c_chi] = chi;
+    state_cell_data[c_K] = K;
+    state_cell_data[c_lapse] = lapse;
+    
+    FOR2_SYM(i, j)
+    {
+        state_cell_data[sym_var_idx(c_h11, i, j)] = h(i, j);
+        state_cell_data[sym_var_idx(c_A11, i, j)] = A(i, j);
+    }
+    FOR (i)
+    {
+        state_cell_data[c_shift1 + i] = shift(i);
+    }
+}
+AMREX_GPU_DEVICE
+AMREX_FORCE_INLINE
+void KerrBHInitialData::compute_kerr(
+    Tensor::Sym12Rank2 &spherical_g,
+    Tensor::Sym12Rank2 &spherical_K,
+    Tensor::Rank1 &spherical_shift,
+    amrex::Real &kerr_lapse,
+    const Coordinates coords) const
+{
+    // Kerr black hole params - mass M and spin a
+    amrex::Real M = m_params.mass;
+    amrex::Real a = m_params.spin;
+
+    // work out where we are on the grid
+    Tensor::Rank1 pos{coords.x, coords.y, coords.z};
+    Tensor::Rank1 pos_rotated = CoordinateTransformations::transform_vector(pos, m_R);
+
+    amrex::Real x = pos_rotated(0);
+    amrex::Real y = pos_rotated(1);
+    amrex::Real z = pos_rotated(2);
+
+    // the radius, subject to a floor
+    amrex::Real r2 = x*x + y*y + z*z;
+    amrex::Real r  = sqrt(amrex::max(r2, 1e-14));
+
+
+    // the radius in xy plane, subject to a floor
+    amrex::Real rho2 = amrex::max(x * x + y * y, 1e-12);
+    amrex::Real rho  = sqrt(rho2);
+
+    // calculate useful position quantities
+    amrex::Real cos_theta  = z / r;
+    amrex::Real sin_theta  = rho / r;
+    amrex::Real cos_theta2 = cos_theta * cos_theta;
+    amrex::Real sin_theta2 = sin_theta * sin_theta;
+
+    // calculate useful metric quantities
+    amrex::Real r_plus  = M + sqrt(M * M - a * a);
+    amrex::Real r_minus = M - sqrt(M * M - a * a);
+
+    // The Boyer-Lindquist coordinate
+    amrex::Real r_BL = r * pow(1.0 + 0.25 * r_plus / r, 2.0);
+
+    // Other useful quantities per 1001.4077
+    amrex::Real Sigma = r_BL * r_BL + a * a * cos_theta2;
+    amrex::Real Delta = r_BL * r_BL - 2.0 * M * r_BL + a * a;
+    // In the paper this is just 'A', but not to be confused with A_ij
+    amrex::Real AA = pow(r_BL * r_BL + a * a, 2.0) - Delta * a * a * sin_theta2;
+    // The rr component of the conformal spatial matric
+    amrex::Real gamma_rr =
+        Sigma * pow(r + 0.25 * r_plus, 2.0) / (r * r2 * (r_BL - r_minus));
+
+    // Metric in semi isotropic Kerr-Schild coordinates, r, theta (t or th), phi
+    // (p)
+    FOR (i, j)
+    {
+        spherical_g(i,j) = 0.0;
+    }
+    spherical_g(0,0) = gamma_rr;                // gamma_rr
+    spherical_g(1,1) = Sigma;                   // gamma_tt
+    spherical_g(2,2) = AA / Sigma * sin_theta2; // gamma_pp
+
+    // Extrinsic curvature
+    FOR (i, j)
+    {
+        spherical_K(i,j) = 0.0;
+    }
+
+    // set non zero elements of Krtp - K_rp, K_tp
+    spherical_K(0,2) =
+        a * M * sin_theta2 / (Sigma * sqrt(AA * Sigma)) *
+        (3.0 * pow(r_BL, 4.0) + 2 * a * a * r_BL * r_BL - pow(a, 4.0) -
+         a * a * (r_BL * r_BL - a * a) * sin_theta2) *
+        (1.0 + 0.25 * r_plus / r) / sqrt(r * r_BL - r * r_minus);
+    spherical_K(2,0) = spherical_K(0,2);
+    spherical_K(2,1) = -2.0 * pow(a, 3.0) * M * r_BL * cos_theta * sin_theta *
+                        sin_theta2 / (Sigma * sqrt(AA * Sigma)) *
+                        (r - 0.25 * r_plus) * sqrt(r_BL / r - r_minus / r);
+    spherical_K(1,2) = spherical_K(2,1);
+
+    // set the analytic lapse
+    kerr_lapse = sqrt(Delta * Sigma / AA);
+
+    // set the shift (only the phi component is non zero)
+    spherical_shift(0) = 0.0;
+    spherical_shift(1) = 0.0;
+    spherical_shift(2) = -2.0 * M * a * r_BL / AA;
+}
+
+#endif /* KERRBHINITIALDATA_IMPL_HPP_ */
+/* GRTeclyn
+ * Copyright 2022 The GRTL collaboration.
+ * Please refer to LICENSE in GRTeclyn's root directory.
+ */
+
+#if !defined(KERRBHINITIALDATA_HPP_)
+#error "This file should only be included through KerrBHInitialData.hpp"
+#endif
+
+#ifndef KERRBHINITIALDATA_IMPL_HPP_
+#define KERRBHINITIALDATA_IMPL_HPP_
+
+#include "DimensionDefinitions.hpp"
+
+// Computes semi-isotropic Kerr solution as detailed in Liu, Etienne and Shapiro
+// 2010, arxiv gr-qc/1001.4077
 AMREX_FORCE_INLINE
 void KerrBHInitialData::operator()(
     int ix, int iy, int iz,
