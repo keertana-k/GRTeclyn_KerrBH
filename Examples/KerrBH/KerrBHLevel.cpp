@@ -41,7 +41,6 @@ void KerrBHLevel::variableSetUp()
 
     Weyl4::set_up(state_index);
 }
-
 // Things to do during the advance step after RK4 steps
 void KerrBHLevel::specific_advance()
 {
@@ -107,7 +106,7 @@ void KerrBHLevel::initData()
         auto state = state_new.array(mfi);
 
         amrex::ParallelFor(box,
-        [=, kerr_initial_data] AMREX_GPU_DEVICE(int ix, int iy, int iz)
+        [=] AMREX_GPU_DEVICE(int ix, int iy, int iz)
         {
             kerr_initial_data(ix, iy, iz, state);
         });
@@ -291,7 +290,7 @@ void KerrBHLevel::tag_cells(amrex::TagBoxArray &a_tag_box_array,
     // Puncture tagger
     PunctureTagger<num_punctures> puncture_tagger(
         Geom().CellSize(0), Level(), get_gr_amr_ptr()->maxLevel(),
-        puncture_coords, {kerr_mass});
+        puncture_coords, {kerrmass});
 
     amrex::ParallelFor(state_new, amrex::IntVect(0),
                        [=] AMREX_GPU_DEVICE(int box_no, int ix, int iy, int iz)
