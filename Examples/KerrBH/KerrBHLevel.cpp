@@ -77,10 +77,10 @@ void KerrBHLevel::initData()
     KerrBHInitialData::params_t params;
 
     GRParmParse pp;
-    pp.get("kerr_mass", params.mass);
-    pp.get("kerr_spin", params.spin);
+    pp.get("kerr.mass", params.mass);
+    pp.get("kerr.spin", params.spin);
     amrex::RealVect center;
-    pp.getarr("kerr_center", center);
+    pp.getarr("kerr.center", center);
 
     for (int i = 0; i < AMREX_SPACEDIM; ++i)
     {
@@ -88,7 +88,7 @@ void KerrBHLevel::initData()
     }
 
     amrex::RealVect spin_direction;
-    pp.getarr("kerr_spin_direction", spin_direction);
+    pp.getarr("kerr.spin_direction", spin_direction);
 
     for (int i = 0; i < AMREX_SPACEDIM; ++i)
     {
@@ -266,8 +266,8 @@ void KerrBHLevel::tag_cells(amrex::TagBoxArray &a_tag_box_array,
 
 // Get Kerr mass from the parameter file
     GRParmParse pp;
-    amrex::Real kerr_mass{};
-    pp.get("kerr_mass", kerr_mass);
+    amrex::Real kerrmass{};
+    pp.get("kerr.mass", kerrmass);
 
     ChiTagger chi_tagger(Geom().CellSize(0), a_regrid_threshold);
 
