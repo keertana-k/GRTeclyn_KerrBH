@@ -17,9 +17,6 @@
 #include "PunctureTagger.hpp"
 #include "PunctureTracker.hpp"
 #include "SphericalExtractionParameters.hpp"
-#ifdef USE_TWOPUNCTURES
-#include "TwoPuncturesInitialData.hpp"
-#endif
 
 class SimulationParameters
 {
@@ -36,13 +33,6 @@ class SimulationParameters
         ExtractionTagger::check_params();
         PunctureTagger<2>::check_params();
         puncture_tracker_params_t::check_params();
-
-#ifndef USE_TWOPUNCTURES
-        BoostedBHInitialData::params_t::check_params(1);
-        BoostedBHInitialData::params_t::check_params(2);
-#else
-        TwoPuncturesInitialData::check_params();
-#endif
 
         spherical_extraction_params_t::check_params("weyl_extraction");
     }
